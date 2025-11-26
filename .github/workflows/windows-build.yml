@@ -20,6 +20,16 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
 
       - name: Flutter doctor
         run: flutter doctor -v
@@ -37,6 +47,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: build/windows/runner/Release
+          # Flutter (较新版本) Windows 可执行文件默认在 x64/runner/Release 目录
+          path: build/windows/x64/runner/Release
 
 
