@@ -3,10 +3,16 @@ import 'package:provider/provider.dart';
 
 import 'repository/history_repository.dart';
 import 'screens/home_screen.dart';
+import 'services/logger_service.dart';
 import 'state/measurement_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 初始化日志服务
+  await LoggerService().init();
+  LoggerService().info('应用启动');
+  
   final FileHistoryRepository repository = FileHistoryRepository();
   runApp(MeasurementApp(repository: repository));
 }

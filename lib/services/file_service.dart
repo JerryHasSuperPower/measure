@@ -44,8 +44,47 @@ class FileService {
     }
   }
 
-  /// 使用系统默认应用打开Excel文件
-  /// [filePath] Excel文件路径
+  /// 保存CSV文件到本地
+  /// [bytes] CSV文件的字节数据
+  /// [fileName] 文件名（不包含扩展名）
+  /// 返回保存的文件路径，如果取消则返回null
+  static Future<String?> saveCsvFile(
+    List<int> bytes,
+    String fileName,
+  ) async {
+    try {
+      // 使用file_picker选择保存位置
+      print('准备显示保存对话框');
+      final String? outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: '保存CSV文件',
+        fileName: '$fileName.csv',
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+      );
+      print('保存对话框返回结果: $outputFile');
+
+      if (outputFile == null || outputFile.isEmpty) {
+        // 用户取消了保存或对话框没有返回有效路径
+        print('用户取消保存或对话框返回空');
+        return null;
+      }
+
+      // 写入文件
+      print('准备写入文件到: $outputFile');
+      final File file = File(outputFile);
+      await file.writeAsBytes(bytes);
+      print('文件写入成功');
+
+      return outputFile;
+    } catch (e, stackTrace) {
+      print('保存文件异常: $e');
+      print('堆栈跟踪: $stackTrace');
+      throw Exception('保存文件失败: $e');
+    }
+  }
+
+  /// 使用系统默认应用打开Excel文件或CSV文件
+  /// [filePath] 文件路径
   static Future<void> openExcelFile(String filePath) async {
     try {
       // 使用系统命令打开文件
@@ -95,6 +134,44 @@ class FileService {
     }
   }
 
+  /// 保存CSV文件到下载文件夹
+  /// [bytes] CSV文件的字节数据
+  /// [fileName] 文件名（不包含扩展名）
+  /// 返回保存的文件路径
+  static Future<String> saveCsvFileToDownloads(
+    List<int> bytes,
+    String fileName,
+  ) async {
+    try {
+      String downloadsPath;
+      if (Platform.isMacOS) {
+        // macOS下载文件夹路径
+        final String homeDir = Platform.environment['HOME'] ?? '';
+        downloadsPath = '$homeDir/Downloads';
+      } else if (Platform.isWindows) {
+        downloadsPath = Platform.environment['USERPROFILE'] ?? '';
+        downloadsPath = '$downloadsPath\\Downloads';
+      } else if (Platform.isLinux) {
+        final String homeDir = Platform.environment['HOME'] ?? '';
+        downloadsPath = '$homeDir/Downloads';
+      } else {
+        throw Exception('不支持的操作系统');
+      }
+
+      final Directory downloadsDir = Directory(downloadsPath);
+      if (!await downloadsDir.exists()) {
+        throw Exception('下载文件夹不存在: $downloadsPath');
+      }
+
+      final String filePath = '$downloadsPath/$fileName.csv';
+      final File file = File(filePath);
+      await file.writeAsBytes(bytes);
+      return filePath;
+    } catch (e) {
+      throw Exception('保存文件到下载文件夹失败: $e');
+    }
+  }
+
   /// 保存Excel文件到下载文件夹
   /// [bytes] Excel文件的字节数据
   /// [fileName] 文件名（不包含扩展名）
@@ -130,6 +207,28 @@ class FileService {
       return filePath;
     } catch (e) {
       throw Exception('保存文件到下载文件夹失败: $e');
+    }
+  }
+
+  /// 选择CSV文件
+  /// 返回文件的字节数据，如果取消则返回null
+  static Future<List<int>?> pickCsvFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        dialogTitle: '选择CSV文件',
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final bytes = await file.readAsBytes();
+        return bytes;
+      }
+
+      return null;
+    } catch (e) {
+      throw Exception('选择文件失败: $e');
     }
   }
 }

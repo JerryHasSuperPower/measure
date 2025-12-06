@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import '../models/daily_measurement.dart';
+import '../models/measurement_history.dart';
 import '../models/measurement_record.dart';
 
 /// 数据计算服务，负责生成测量数据
@@ -161,6 +163,91 @@ class DataCalculator {
     }
 
     return values;
+  }
+
+  /// 根据每日测量数据和原始记录计算新的测量数据
+  /// [dailyValues] 每日测量数据（每行的值，按索引对应）
+  /// [baseRecords] 原始记录的测量数据列表
+  /// 返回新的测量记录列表
+  static List<MeasurementRecord> calculateFromDailyData(
+    List<double> dailyValues,
+    List<MeasurementRecord> baseRecords,
+  ) {
+    if (dailyValues.length != baseRecords.length) {
+      throw Exception('每日数据行数(${dailyValues.length})与原始记录行数(${baseRecords.length})不一致');
+    }
+
+    final List<MeasurementRecord> newRecords = [];
+
+    // 计算新的profile值：原始profile + 每日数据
+    final List<double> newProfiles = [];
+    for (int i = 0; i < baseRecords.length; i++) {
+      final double newProfile = baseRecords[i].profile + dailyValues[i];
+      newProfiles.add(double.parse(newProfile.toStringAsFixed(2)));
+    }
+
+    // 生成每行的数据
+    for (int i = 0; i < baseRecords.length; i++) {
+      final MeasurementRecord baseRecord = baseRecords[i];
+      final double newProfile = newProfiles[i];
+
+      // 计算 (A0-A180)/2
+      // 当前行profile - 下一行profile，最后一行 = profile - 0
+      double a0MinusA180Div2;
+      if (i < baseRecords.length - 1) {
+        a0MinusA180Div2 = newProfile - newProfiles[i + 1];
+      } else {
+        // 最后一行
+        a0MinusA180Div2 = newProfile - 0.0;
+      }
+      // 保留两位小数
+      a0MinusA180Div2 = double.parse(a0MinusA180Div2.toStringAsFixed(2));
+
+      // 重新随机生成 A0+A180：-1.5到-2.5之间的随机数
+      final double a0PlusA180 =
+          double.parse((-1.5 + _random.nextDouble() * (-2.5 - (-1.5))).toStringAsFixed(2));
+
+      // 解方程组计算 A0 和 A180
+      // 已知：(A0-A180)/2 = a0MinusA180Div2，所以 A0-A180 = 2 * a0MinusA180Div2
+      // 已知：A0+A180 = a0PlusA180
+      // 解方程组：
+      // A0 = (a0PlusA180 + 2 * a0MinusA180Div2) / 2
+      // A180 = (a0PlusA180 - 2 * a0MinusA180Div2) / 2
+      final double a0 = double.parse(((a0PlusA180 + 2 * a0MinusA180Div2) / 2).toStringAsFixed(2));
+      final double a180 = double.parse(((a0PlusA180 - 2 * a0MinusA180Div2) / 2).toStringAsFixed(2));
+
+      // 创建新记录，ProfileK保持原始值不变
+      newRecords.add(MeasurementRecord(
+        depth: baseRecord.depth,
+        a0: a0,
+        a180: a180,
+        a0PlusA180: a0PlusA180,
+        a0MinusA180Div2: a0MinusA180Div2,
+        profile: newProfile,
+        profilek: baseRecord.profilek, // ProfileK保持原始值
+      ));
+    }
+
+    return newRecords;
+  }
+
+  /// 批量计算多日数据
+  /// [dailyMeasurements] 多日测量数据列表
+  /// [baseRecords] 原始记录的测量数据列表
+  /// 返回按日期索引的新测量记录列表
+  static Map<DateTime, List<MeasurementRecord>> calculateMultipleDays(
+    List<DailyMeasurement> dailyMeasurements,
+    List<MeasurementRecord> baseRecords,
+  ) {
+    final Map<DateTime, List<MeasurementRecord>> results = {};
+
+    for (final dailyMeasurement in dailyMeasurements) {
+      final List<MeasurementRecord> calculatedRecords =
+          calculateFromDailyData(dailyMeasurement.values, baseRecords);
+      results[dailyMeasurement.date] = calculatedRecords;
+    }
+
+    return results;
   }
 }
 
